@@ -8,7 +8,7 @@ namespace Innkeeper.Core
     ///
     /// Subclasses decide WHEN and WHERE to move by calling TryStep().
     /// This class handles HOW: smoothing between tiles, snapping on spawn,
-    /// and collision checks against the world.
+    /// collision checks, and tracking which way the actor is facing.
     /// </summary>
     [RequireComponent(typeof(Rigidbody2D))]
     public abstract class GridActor : MonoBehaviour
@@ -31,6 +31,9 @@ namespace Innkeeper.Core
         protected Rigidbody2D rb;
         protected Vector2 targetPosition;
 
+        /// <summary>Last cardinal direction the actor moved or tried to move. Defaults to down.</summary>
+        public Vector2Int Facing { get; protected set; } = Vector2Int.down;
+
         /// <summary>True while the actor is moving between tiles.</summary>
         public bool IsMoving => (Vector2)rb.position != targetPosition;
 
@@ -39,6 +42,12 @@ namespace Innkeeper.Core
             new Vector2Int(
                 Mathf.RoundToInt(targetPosition.x / tileSize),
                 Mathf.RoundToInt(targetPosition.y / tileSize));
+
+        /// <summary>The tile directly in front of the actor.</summary>
+        public Vector2Int TileInFront => CurrentTile + Facing;
+
+        /// <summary>The world-space center of the tile in front of the actor.</summary>
+        public Vector2 PositionInFront => (Vector2)TileInFront * tileSize;
 
         protected virtual void Awake()
         {
@@ -57,14 +66,18 @@ namespace Innkeeper.Core
         }
 
         /// <summary>
-        /// Request a one-tile step in a cardinal direction. Ignored if
-        /// already mid-step or if the target tile is blocked.
+        /// Request a one-tile step in a cardinal direction. Updates Facing
+        /// even if the step is blocked (so the actor turns to face walls).
         /// Returns true if the step was accepted.
         /// </summary>
         public bool TryStep(Vector2Int direction)
         {
-            if (IsMoving) return false;
             if (direction == Vector2Int.zero) return false;
+
+            // Update facing regardless of whether we actually move.
+            Facing = direction;
+
+            if (IsMoving) return false;
 
             Vector2 step = new Vector2(direction.x, direction.y) * tileSize;
             Vector2 candidate = (Vector2)rb.position + step;
