@@ -61,7 +61,7 @@ namespace Innkeeper.Core
             Vector2 newPos = Vector2.MoveTowards(
                 rb.position,
                 targetPosition,
-                moveSpeed * Time.fixedDeltaTime);
+                moveSpeed * UnityEngine.Time.fixedDeltaTime);
             rb.MovePosition(newPos);
         }
 

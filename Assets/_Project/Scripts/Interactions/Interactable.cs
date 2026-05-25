@@ -27,10 +27,18 @@ namespace Innkeeper.Interactions
                 Mathf.RoundToInt(transform.position.y / tileSize));
 
         /// <summary>Text the UI should show when this interactable is targeted.</summary>
-        public string Prompt => prompt;
+        public virtual string Prompt => prompt;
 
         /// <summary>Whether the player can currently interact with this object.</summary>
         public virtual bool CanInteract => true;
+
+        /// <summary>
+        /// Whether the prompt UI should be visible at all. Defaults to CanInteract —
+        /// most interactables vanish when they're no longer actionable. Override to
+        /// `true` (or other logic) if the interactable should still display text
+        /// even when not actionable, to explain why (e.g. "Too early to sleep").
+        /// </summary>
+        public virtual bool ShowPrompt => CanInteract;
 
         protected virtual void OnEnable() => InteractionRegistry.Register(this);
         protected virtual void OnDisable() => InteractionRegistry.Unregister(this);

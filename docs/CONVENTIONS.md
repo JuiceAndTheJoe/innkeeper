@@ -88,6 +88,14 @@ work."
 - **Movement blockers belong on the `Walls` layer** (layer index 6).
   `GridActor.blockingLayers` references it. New blocking things should be painted
   on the Walls tilemap or assigned to the Walls layer.
+- **`UnityEngine.Time` must be fully qualified.** Our `Innkeeper.Time` namespace
+  (clock/calendar code in `Scripts/Time/`) shadows Unity's `Time` class in any
+  file with `using Innkeeper.Time;`. Always write `UnityEngine.Time.deltaTime`
+  or `UnityEngine.Time.fixedDeltaTime` — never bare `Time.deltaTime`. The bare
+  form may compile *today* in a file that doesn't import our namespace, but it's
+  a latent landmine the moment someone adds the import. Apply the qualified form
+  preemptively. (This is the price of mirroring folder names in namespaces; see
+  also ADR-006 / CONVENTIONS § Naming.)
 
 ### Unity 6 specifics
 

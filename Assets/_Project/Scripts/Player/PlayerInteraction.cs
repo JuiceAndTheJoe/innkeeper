@@ -19,10 +19,18 @@ namespace Innkeeper.Player
         private PlayerControls controls;
 
         /// <summary>
-        /// The Interactable currently being looked at, or null. UI can read
-        /// this to show/hide a prompt.
+        /// The Interactable currently being looked at AND actionable. Null if
+        /// nothing is in front of the player, or if the thing in front returns
+        /// CanInteract == false. The Interact key uses this.
         /// </summary>
         public Interactable CurrentTarget { get; private set; }
+
+        /// <summary>
+        /// The Interactable currently being looked at, regardless of whether it's
+        /// actionable. UI reads this to decide whether to show a prompt at all;
+        /// it pairs with CurrentTarget to decide whether to show the [E] key hint.
+        /// </summary>
+        public Interactable CurrentVisible { get; private set; }
 
         private void Awake()
         {
@@ -42,8 +50,11 @@ namespace Innkeeper.Player
         private void Update()
         {
             // Track what's in front of us every frame so UI stays responsive.
+            // CurrentVisible answers "is there something to describe?";
+            // CurrentTarget answers "is there something to act on?".
             Interactable found = InteractionRegistry.GetAt(actor.TileInFront);
-            CurrentTarget = (found != null && found.CanInteract) ? found : null;
+            CurrentVisible = (found != null && found.ShowPrompt) ? found : null;
+            CurrentTarget  = (found != null && found.CanInteract) ? found : null;
         }
 
         private void OnInteractPressed(InputAction.CallbackContext ctx)

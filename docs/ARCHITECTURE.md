@@ -3,7 +3,7 @@
 This document describes how the codebase is organized, the responsibilities
 of each system, and the patterns to follow when extending it.
 
-For *why* specific choices were made, see [`DECISIONS.md`](DECISIONS.md).
+For _why_ specific choices were made, see [`DECISIONS.md`](DECISIONS.md).
 
 ## Tech stack
 
@@ -59,10 +59,10 @@ in sync as folders are added.
 
 ## Layers, tags, and physics
 
-| Layer    | Index | Purpose                                       |
-|----------|-------|-----------------------------------------------|
-| Default  | 0     | Most GameObjects (player, interactables, UI). |
-| Walls    | 6     | Tilemap layer that blocks `GridActor` movement. |
+| Layer   | Index | Purpose                                         |
+| ------- | ----- | ----------------------------------------------- |
+| Default | 0     | Most GameObjects (player, interactables, UI).   |
+| Walls   | 6     | Tilemap layer that blocks `GridActor` movement. |
 
 No custom tags are defined. `GridActor.blockingLayers` references the Walls
 layer (used by `Physics2D.OverlapCircle` before committing a step). New
@@ -76,6 +76,7 @@ assigned to the Walls layer themselves.
 Abstract base class for any entity that moves on the tile grid.
 
 Responsibilities:
+
 - Snap to grid on spawn.
 - Move smoothly between tile centers via `Rigidbody2D.MovePosition`
   (`Vector2.MoveTowards` toward the target each `FixedUpdate`).
@@ -86,10 +87,11 @@ Responsibilities:
   need to reason about grid position.
 - Reject moves that overlap a `blockingLayers` collider at the target tile.
 
-Subclasses decide *when* and *where* to move by calling `TryStep(direction)`.
+Subclasses decide _when_ and _where_ to move by calling `TryStep(direction)`.
 They do not implement movement themselves.
 
 Concrete subclasses (current and planned):
+
 - `PlayerMovement` — input-driven
 - `StaffActor` (planned) — task-queue driven
 - `GuestActor` (planned) — need-driven AI
@@ -117,7 +119,7 @@ enabling the map in `OnEnable`, and disabling in `OnDisable`.
 Three components form the interaction framework:
 
 1. **`Interactable`** (abstract MonoBehaviour) — base class for anything
-   the player can interact with. Defines `Prompt` (string for UI),
+   the player can interact with. Defines `Prompt` (virtual string for UI; override for dynamic prompts),
    `OccupiedTile` (grid coordinate), `CanInteract` (override to gate by
    state), and `OnInteract()` (override to implement behavior).
 
@@ -135,6 +137,7 @@ Adding a new interactable type = create a subclass of `Interactable`, override
 If you override `OnEnable`/`OnDisable`, call `base` so registration still runs.
 
 Current concrete interactables:
+
 - `BrokenChair` — placeholder; changes color from dull to warm on interact,
   then reports `CanInteract => false` so the prompt disappears.
 
@@ -144,6 +147,7 @@ Uses Unity's uGUI system (Canvas + RectTransform + Image + TextMeshPro),
 not UI Toolkit. World-space and screen-space UI live on separate Canvases.
 
 Current canvases:
+
 - `WorldUI` (world-space) — holds the floating `InteractionPrompt`.
 
 `InteractionPromptUI` reads `PlayerInteraction.CurrentTarget` in `LateUpdate`

@@ -46,20 +46,25 @@ namespace Innkeeper.UI
         private void LateUpdate()
         {
             // LateUpdate so we run AFTER PlayerInteraction.Update has refreshed
-            // CurrentTarget for this frame. Avoids one frame of stale state.
-            Interactable target = playerInteraction != null
-                ? playerInteraction.CurrentTarget
-                : null;
+            // its targets for this frame. Avoids one frame of stale state.
+            if (playerInteraction == null)
+            {
+                SetVisible(false);
+                return;
+            }
 
-            if (target == null)
+            Interactable visible = playerInteraction.CurrentVisible;
+            if (visible == null)
             {
                 SetVisible(false);
                 return;
             }
 
             SetVisible(true);
-            promptText.text = keyPrefix + target.Prompt;
-            transform.position = target.transform.position + worldOffset;
+            // Only show the [E] key hint when the interactable is actually actionable.
+            bool actionable = playerInteraction.CurrentTarget == visible;
+            promptText.text = actionable ? keyPrefix + visible.Prompt : visible.Prompt;
+            transform.position = visible.transform.position + worldOffset;
         }
 
         private void SetVisible(bool visible)

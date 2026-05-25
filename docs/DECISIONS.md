@@ -148,3 +148,87 @@ Phase 9** as a supply-chain extension that feeds the inn's menu.
 - `Scripts/World`, `Scripts/Items`, and `Scripts/Time` are scaffolded for inn
   systems first
 - The [ROADMAP](ROADMAP.md) orders farming as Phase 9, after the vertical slice
+
+---
+
+## ADR-006: TimeSystem — integer-minute clock as singleton MonoBehaviour
+
+**Date:** 2026-05-24
+**Status:** Accepted
+
+**Context:** Phase 2 introduces in-game time. Many later systems will read or
+react to it: sleep (skip to morning), HUD clock, day/night light tint, NPC
+schedules (Phase 5), guest arrival windows (Phase 6), and crop growth (Phase 9).
+Save/load (Phase 4) must restore the calendar exactly. The design has three
+axes: how time is stored, how systems consume it, and where the system lives.
+
+**Decision:**
+- **Authoritative unit is `long totalMinutes`** since game start. Hour, day,
+  day-of-week, season, and year are computed views, not stored fields.
+- **Calendar shape is fixed:** 60 minutes/hour, 24 hours/day, 7 days/week,
+  4 weeks/season (28 days), 4 seasons/year. Locked at ADR time — changing it
+  later requires a save migrator.
+- **Tick discretely**, not smoothly. Default 10 in-game minutes per tick; real
+  seconds per tick is `[SerializeField]` on the runtime component for tuning.
+  Driven by an `Update` accumulator, **not `FixedUpdate`** — game time is
+  independent of physics timestep.
+- **Hybrid consumption:** polling via `TimeSystem.Now` (a `GameTime` view
+  struct) for the HUD and any "what time is it?" query; events
+  (`OnTick`, `OnHourChanged`, `OnDayChanged`, `OnSeasonChanged`) for systems
+  that react to transitions.
+- **Time-skip API:** `AdvanceTo(targetMinutes)` fires each boundary event
+  **exactly once**, regardless of how much time is skipped. Sleep uses this;
+  intermediate hours don't spam subscribers.
+- **Lives as a singleton `MonoBehaviour`** auto-instantiated via
+  `[RuntimeInitializeOnLoadMethod]` with `DontDestroyOnLoad`. Accessed via
+  `TimeSystem.Instance` and static convenience forwarders (`TimeSystem.Now`,
+  `TimeSystem.OnDayChanged`, etc.).
+- **Configuration in a `TimeConfig` ScriptableObject**
+  (`Assets/_Project/ScriptableObjects/TimeConfig.asset`): minutes-per-tick,
+  real-seconds-per-tick, starting date. State stays on the singleton; tunables
+  stay on the SO.
+- **Pause is a `TimeSystem.IsPaused` flag**, not `Time.timeScale`. Timescale
+  also freezes physics/animation; we want those concerns separable.
+
+**Why:**
+- Integer minutes eliminate float drift over long sessions, give exact equality
+  ("is it 06:00?"), and serialize as a single `long`. A struct-as-source-of-truth
+  alternative would push carry/rollover logic onto every caller
+- Discrete ticks match the discrete feel of grid movement and the cozy genre
+  (Stardew, not RTS). Smooth interpolation is a render concern the clock UI can
+  add later if needed
+- The hybrid consumption model fits two genuinely different use cases: the HUD
+  wants the current value every frame and ignores transitions; spawn/schedule
+  systems want transitions and shouldn't poll. Forcing either pattern on the
+  other creates friction
+- `AdvanceTo` with single-fire events prevents an entire class of sleep bugs —
+  guests spawning 12 times when the player sleeps 12 hours, etc. Cheap to
+  design in now, expensive to retrofit
+- Singleton MonoBehaviour is a deliberate deviation from ADR-002's "prefer
+  static registry" pattern. ADR-002 fits *passive spatial lookup*; TimeSystem
+  is *active* — it has an `Update` loop, configurable tunables, and a lifecycle.
+  A static class would need a hidden driver MonoBehaviour anyway and would
+  inherit ADR-002's domain-reload pitfall on a system the whole game depends on.
+  The runtime-init pattern gives the ergonomics of "it just exists" without
+  requiring placement in every scene
+
+**Consequences:**
+- Calendar shape is a one-way door. Old saves become unreadable if the shape
+  changes without a migration step. The save format (Phase 4) must include a
+  `configVersion` field from day one
+- Save state for the clock is one number: `totalMinutes` (plus `configVersion`).
+  Subscribers re-register themselves on load via `OnEnable`
+- Event subscription discipline mirrors ADR-002's registry pattern: subscribe
+  in `OnEnable`, unsubscribe in `OnDisable`, call `base` if overriding.
+  Forgetting leaks subscribers across scene reloads
+- `SetTime` is not publicly exposed. Public mutation is `AdvanceTo` (for
+  sleep/skip) and internal `Tick`. Debug-only manipulation goes behind an
+  editor-only panel — prevents Phase-5+ scripts from quietly nudging the clock
+  and creating mystery bugs
+- Tick rate is unknowable until playtest. Default of ~1 real second per 10
+  in-game minutes (24h day in ~144 real seconds) is a starting point; expect
+  to tune it once guests exist in Phase 6
+- Two pause concepts coexist: `TimeSystem.IsPaused` (clock only) and
+  `Time.timeScale = 0` (visual/physics freeze). The pause menu in Phase 2 will
+  set both; cutscenes that should freeze the world but not the clock (or vice
+  versa) can use only one
