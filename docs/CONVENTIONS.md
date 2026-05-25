@@ -31,7 +31,7 @@ the Unity-6-specific pitfalls that cost the most time. The repo-root
   isolated from Unity-generated and third-party files keeps a future audit or
   migration clean.
   - `Scripts/` — split by domain: `Core/`, `Player/`, `Interactions/`, `UI/`,
-    and the planned `World/`, `Items/`, `Time/`.
+    `World/`, `Time/`, and the planned `Items/`.
   - `Art/` — sprites, tile assets, tile palettes (e.g. `InnPalette.prefab`).
   - `Scenes/` — game scenes (currently `Inn.unity`).
   - `Input/` — the input actions asset and its generated C# class.

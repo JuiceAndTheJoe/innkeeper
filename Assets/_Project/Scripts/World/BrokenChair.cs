@@ -1,6 +1,7 @@
 using UnityEngine;
+using Innkeeper.Interactions;
 
-namespace Innkeeper.Interactions
+namespace Innkeeper.World
 {
     /// <summary>
     /// A broken chair the player can repair. On interaction, the chair

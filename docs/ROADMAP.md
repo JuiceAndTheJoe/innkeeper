@@ -26,6 +26,12 @@ around a tile-mapped inn interior, walls that block movement, a follow
 camera, and a generic interaction framework with one concrete example
 (a repairable chair) and a world-space UI prompt.
 
+**Phase 2 — Time and core loop** is underway. An in-game clock
+(`TimeSystem`) drives time, a screen-space HUD clock displays it, a
+day/night global light tints the room across the day, and a `Bed` lets the
+player sleep to the next morning. Still to do this phase: the `DirtyFloor`
+and `Fireplace` interactables and a pause menu.
+
 The code is small but architecturally honest — every system is structured
 to grow without needing a rewrite.
 
@@ -50,12 +56,12 @@ Goal: a player can walk around a room and interact with one object.
 Goal: time passes; the player can sleep, days advance, and a few
 interactable types exist.
 
-- [ ] `TimeSystem` (in-game clock, hours, days, week, season)
-- [ ] HUD clock display (screen-space UI Canvas)
-- [ ] `Bed` interactable — interact to sleep until morning, advances day
+- [x] `TimeSystem` (in-game clock, hours, days, week, season)
+- [x] HUD clock display (screen-space UI Canvas)
+- [x] `Bed` interactable — interact to sleep until morning, advances day
 - [ ] `DirtyFloor` interactable — interact to clean, restores to clean tile
 - [ ] `Fireplace` interactable — light/extinguish, affects room state
-- [ ] Time-of-day visual tint (URP 2D global light, simple day/night curve)
+- [x] Time-of-day visual tint (URP 2D global light, simple day/night curve)
 - [ ] Pause menu (Esc to open)
 
 End-of-phase test: walk around, repair the chair, clean a floor, light

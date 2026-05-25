@@ -232,3 +232,42 @@ axes: how time is stored, how systems consume it, and where the system lives.
   `Time.timeScale = 0` (visual/physics freeze). The pause menu in Phase 2 will
   set both; cutscenes that should freeze the world but not the clock (or vice
   versa) can use only one
+
+---
+
+## ADR-007: Concrete interactables live in their domain folder, not `Interactions/`
+
+**Date:** 2026-05-25
+**Status:** Accepted
+
+**Context:** Phase 1 placed the only concrete interactable, `BrokenChair`, in
+`Scripts/Interactions/` alongside the interaction framework itself. Phase 2
+adds `Bed`, `DirtyFloor`, and `Fireplace`, and later phases add chests, crops,
+shop counters, and more. Continuing the Phase 1 pattern would turn
+`Interactions/` into a catch-all for any object the player can press E on.
+
+**Decision:** `Scripts/Interactions/` holds **only the interaction framework**
+(`Interactable`, `InteractionRegistry`, `PlayerInteraction`). Concrete
+interactables live in **the domain folder that matches what they are**:
+furniture and building elements in `World/`, containers and pickups in
+`Items/`, and so on. `BrokenChair` moves from `Interactions/` to `World/` as
+part of this ADR.
+
+**Why:**
+- `Interactable` is a *capability* an object has, not a *category* it belongs
+  to. Sorting files by capability scales poorly once most world objects are
+  interactable.
+- Objects often have non-interaction concerns too — a fireplace emits light
+  and affects room state, a bed has occupancy, a dirty floor has cleanliness.
+  Grouping by domain keeps those concerns together.
+- Keeps the framework folder small and obvious: three files that define how
+  interaction works, separate from the growing list of things that *use* it.
+
+**Consequences:**
+- Subclasses of `Interactable` use the namespace of their new folder
+  (e.g. `Innkeeper.World` for `BrokenChair`), not `Innkeeper.Interactions`.
+- `Interactions/` stays small. New framework-level pieces (e.g. an
+  interaction-cooldown system) still belong there; new content does not.
+- Anything that imports a concrete interactable by type needs the new
+  namespace. References through the `Interactable` base class via the
+  registry are unaffected.

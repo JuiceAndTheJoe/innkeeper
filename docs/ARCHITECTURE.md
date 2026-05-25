@@ -31,11 +31,11 @@ Assets/_Project/
 ├── Scripts/
 │   ├── Core/           Shared base classes, used by multiple systems
 │   ├── Player/         Input-driven, player-only logic
-│   ├── Interactions/   The interaction framework + concrete interactables
+│   ├── Interactions/   The interaction framework only (concrete interactables live in their domain folder — see ADR-007)
 │   ├── UI/             Canvas-based prompts, HUD, menus
-│   ├── World/          (planned) Tile / world / building logic
+│   ├── World/          Tile / world / building logic (furniture, fixtures, building elements)
 │   ├── Items/          (planned) Inventory and item data
-│   ├── Time/           (planned) Day/night, clock, scheduling
+│   ├── Time/           Day/night, clock, scheduling
 │   └── ...
 ├── Scenes/             Currently: Inn.unity
 ├── Prefabs/            (empty for now)
@@ -53,9 +53,9 @@ Assets/_Project/
 > The `Assets/_Project/Settings/` folder exists but is currently empty. Don't
 > move pipeline assets into `_Project/`.
 
-Each script folder roughly maps to a C# namespace: `Innkeeper.Core`,
-`Innkeeper.Player`, `Innkeeper.Interactions`, `Innkeeper.UI`. Keep them
-in sync as folders are added.
+Each script folder maps to a C# namespace: `Innkeeper.Core`,
+`Innkeeper.Player`, `Innkeeper.Interactions`, `Innkeeper.UI`,
+`Innkeeper.World`, `Innkeeper.Time`. Keep them in sync as folders are added.
 
 ## Layers, tags, and physics
 
@@ -132,14 +132,64 @@ Three components form the interaction framework:
    registry for the tile in front of the player's `GridActor`. Exposes
    `CurrentTarget`. On Interact key press, calls `CurrentTarget.OnInteract()`.
 
-Adding a new interactable type = create a subclass of `Interactable`, override
-`OnInteract()`, attach to a GameObject at a tile center with a SpriteRenderer.
-If you override `OnEnable`/`OnDisable`, call `base` so registration still runs.
+Adding a new interactable type = create a subclass of `Interactable` in the
+domain folder that matches what it is (furniture and building elements in
+`World/`, containers and pickups in `Items/`, etc. — not in `Interactions/`,
+which holds only the framework). Override `OnInteract()`, attach to a
+GameObject at a tile center with a SpriteRenderer. If you override
+`OnEnable`/`OnDisable`, call `base` so registration still runs. See
+[ADR-007](DECISIONS.md#adr-007-concrete-interactables-live-in-their-domain-folder-not-interactions).
 
 Current concrete interactables:
 
-- `BrokenChair` — placeholder; changes color from dull to warm on interact,
-  then reports `CanInteract => false` so the prompt disappears.
+- `BrokenChair` (`Scripts/World/`) — placeholder; changes color from dull to
+  warm on interact, then reports `CanInteract => false` so the prompt
+  disappears.
+- `Bed` (`Scripts/World/`) — sleep-to-morning. `OnInteract` calls
+  `TimeSystem.AdvanceToNext(wakeHour)` when the current time is inside its
+  sleep window; outside the window `CanInteract` is false and the overridden
+  `Prompt` switches to a "too early" message.
+
+### Time (`Scripts/Time/`)
+
+`TimeSystem` is the authoritative in-game clock (see
+[ADR-006](DECISIONS.md#adr-006-timesystem--integer-minute-clock-as-singleton-monobehaviour)).
+It is a singleton MonoBehaviour bootstrapped via `RuntimeInitializeOnLoadMethod`
+before the first scene loads, survives scene changes with `DontDestroyOnLoad`,
+and runs at `DefaultExecutionOrder(-1000)` so subscribers see the new time on
+the same frame it advances.
+
+State is a single `long` of total in-game minutes; `GameTime` is a value-type
+snapshot that derives hour / day / day-of-week / season from it. Tunables
+(`MinutesPerTick`, `RealSecondsPerTick`, start date) live on a `TimeConfig`
+ScriptableObject, loaded from `Resources/TimeConfig` if not assigned, with
+hard-coded fallbacks.
+
+Two consumption models coexist (the hybrid model in ADR-006):
+
+- **Events** — `OnTick`, `OnHourChanged`, `OnDayChanged`, `OnSeasonChanged`,
+  for discrete reactions (e.g. the HUD clock). Subscribe in `OnEnable`,
+  unsubscribe in `OnDisable` — same discipline as `InteractionRegistry`.
+- **Polling** — `TimeSystem.Now` returns the current `GameTime` cheaply every
+  frame, for when smoothness matters (e.g. the day/night light).
+
+Time-skip (`AdvanceTo` / `AdvanceBy` / `AdvanceToNext`) jumps the clock and
+fires each crossed boundary exactly once; backward travel is rejected. `Bed`
+uses `AdvanceToNext(wakeHour)`. `IsPaused` halts ticking (clock only — it does
+**not** touch `Time.timeScale`). `GetSaveState` / `LoadSaveState` expose the
+clock as a single number for Phase 4 save/load.
+
+### World (`Scripts/World/`)
+
+Domain folder for furniture, fixtures, and building-level systems, plus the
+concrete interactables that belong to them (see
+[ADR-007](DECISIONS.md#adr-007-concrete-interactables-live-in-their-domain-folder-not-interactions)).
+Beyond the interactables listed above, it currently holds:
+
+- `DayNightLight` — drives a URP 2D global `Light2D` from the clock. Polls
+  `TimeSystem.Now` each `Update` and interpolates color and intensity between
+  dawn / day / dusk / night keyframes, so the room fades smoothly across the
+  day instead of snapping on hour boundaries.
 
 ### UI (`Scripts/UI/`)
 
@@ -149,10 +199,16 @@ not UI Toolkit. World-space and screen-space UI live on separate Canvases.
 Current canvases:
 
 - `WorldUI` (world-space) — holds the floating `InteractionPrompt`.
+- A screen-space-overlay HUD Canvas — holds the `HudClock` label.
 
 `InteractionPromptUI` reads `PlayerInteraction.CurrentTarget` in `LateUpdate`
 (after the player updates its target for the frame) and positions a small
 panel above the targeted Interactable.
+
+`HudClock` renders the current time on a TextMeshPro label, driven by
+`TimeSystem.OnTick` (event-driven, not per-frame polling — subscribe in
+`OnEnable`, unsubscribe in `OnDisable`). An optional secondary label shows
+day-of-week / season / day.
 
 ### Camera (Cinemachine 3.1.6)
 
@@ -212,7 +268,9 @@ same pattern.
 
 ## Out of scope (current phase)
 
-- Farming, crops, weather, seasons — planned for later phases, not now.
+- Farming, crops, weather, seasonal *gameplay* — planned for later phases, not
+  now. (The clock already tracks the calendar season via `TimeSystem`; what's
+  deferred is seasonal *effects* like crop growth and weather.)
 - Multiplayer / networking — not planned.
 - Mobile or console builds — desktop-only until the vertical slice is done.
 - Real art assets — placeholder shapes only. Art comes after core systems
